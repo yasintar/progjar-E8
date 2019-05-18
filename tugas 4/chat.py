@@ -53,6 +53,19 @@ class Chat:
 				sessionid = j[2].strip()
 				print "{} is joining {}...".format(self.sessions[sessionid]['username'], group)
 				return self.join_group(group, sessionid)
+			elif (command == 'send_group'):
+				group = j[1].strip()
+				sessionid = j[2].strip()
+				message = ""
+				for w in j[3:]:
+					message = "{} {}".format(message, w)
+				print "{} is sending message to group : {}".format(self.sessions[sessionid]['username'], group)
+				return self.send_group(group, sessionid, message)
+			elif (command == 'inbox_group'):
+				group = j[1].strip()
+				sessionid = j[2].strip()
+				print "inbox_group {}".format(group)
+				return self.inbox_group(group, sessionid)
 			elif (command == 'leave_group'):
 				group = j[1].strip()
 				sessionid = j[2].strip()
@@ -139,6 +152,22 @@ class Chat:
 		self.groups[group_name]['users'].remove(username)
 		return {'status': 'OK', 'message': 'You left the group'}
 
+	def send_group(self, group_name, sessionid, message):
+		if group_name not in self.groups:
+			return {'status': 'ERROR', 'message': 'Group tidak ada'}
+		username = self.sessions[sessionid]['username']
+		if username not in self.groups[group_name]['users']:
+			return {'status': 'ERROR', 'message': 'Kamu tidak bergabung di grup'}
+		self.groups[group_name]['log'].append({'from': username, 'message': message})
+		return {'status': 'OK', 'message': 'Message sent'}
+
+	def inbox_group(self, group_name, sessionid):
+		if group_name not in self.groups:
+			return {'status': 'ERROR', 'message': 'Group tidak ada'}
+		username = self.sessions[sessionid]['username']
+		if username not in self.groups[group_name]['users']:
+			return {'status': 'ERROR', 'message': 'Kamu tidak bergabung di grup'}
+		return {'status': 'OK', 'messages': self.groups[group_name]['log']}
 
 if __name__=="__main__":
 	j = Chat()
