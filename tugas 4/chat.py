@@ -8,9 +8,13 @@ class Chat:
 	def __init__(self):
 		self.sessions={}
 		self.users = {}
+		self.groups = {}
+		self.users['messi'] = {'nama': 'Lionel Messi', 'negara': 'Argentina', 'password': 'surabaya', 'incoming': {},
+							   'outgoing': {}}
 		self.users['meutia']={ 'nama': 'Navinda Meutia', 'negara': 'Indonesia', 'password': 'meutia123', 'incoming' : {}, 'outgoing': {}}
 		self.users['sari']={ 'nama': 'Sari Wahyuningsih', 'negara': 'Inggris', 'password': 'sari123', 'incoming': {}, 'outgoing': {}}
 		self.users['yasinta']={ 'nama': 'Yasinta Romadhona', 'negara': 'Fiji', 'password': 'yasin123','incoming': {}, 'outgoing':{}}
+
 	def proses(self,data):
 		j=data.split(" ")
 		try:
@@ -18,30 +22,51 @@ class Chat:
 			if (command=='auth'):
 				username=j[1].strip()
 				password=j[2].strip()
-                                print "auth {}" . format(username)
+				print "auth {}" . format(username)
 				return self.autentikasi_user(username,password)
 			elif (command=='send'):
 				sessionid = j[1].strip()
 				usernameto = j[2].strip()
-                                message=""
-                                for w in j[3:]:
-                                    message="{} {}" . format(message,w)
+				message=""
+				for w in j[3:]:
+					message="{} {}" . format(message,w)
 				usernamefrom = self.sessions[sessionid]['username']
-                                print "send message from {} to {}" . format(usernamefrom,usernameto)
+				print "send message from {} to {}" . format(usernamefrom,usernameto)
 				return self.send_message(sessionid,usernamefrom,usernameto,message)
-                        elif (command=='inbox'):
-                                sessionid = j[1].strip()
-                                username = self.sessions[sessionid]['username']
-                                print "inbox {}" . format(sessionid)
-                                return self.get_inbox(username)
+			elif (command=='inbox'):
+				sessionid = j[1].strip()
+				username = self.sessions[sessionid]['username']
+				print "inbox {}" . format(sessionid)
+				return self.get_inbox(username)
+			elif (command == 'logout'):
+				sessionid = j[1].strip()
+				if (sessionid in self.sessions):
+					del self.sessions[sessionid]
+				return {'status': 'OK'}
+			elif (command == 'create_group'):
+				group = j[1].strip()
+				sessionid = j[2].strip()
+				print "creating group {}...".format(group)
+				return self.create_group(group, sessionid)
+			elif (command == 'join_group'):
+				group = j[1].strip()
+				sessionid = j[2].strip()
+				print "{} is joining {}...".format(self.sessions[sessionid]['username'], group)
+				return self.join_group(group, sessionid)
+			elif (command == 'leave_group'):
+				group = j[1].strip()
+				sessionid = j[2].strip()
+				print "{} is leaving {}...".format(self.sessions[sessionid]['username'], group)
+				return self.leave_group(group, sessionid)
 			else:
 				return {'status': 'ERROR', 'message': '**Protocol Tidak Benar'}
 		except IndexError:
 			return {'status': 'ERROR', 'message': '--Protocol Tidak Benar'}
+
 	def autentikasi_user(self,username,password):
 		if (username not in self.users):
 			return { 'status': 'ERROR', 'message': 'User Tidak Ada' }
- 		if (self.users[username]['password']!= password):
+		if (self.users[username]['password']!= password):
 			return { 'status': 'ERROR', 'message': 'Password Salah' }
 		tokenid = str(uuid.uuid4()) 
 		self.sessions[tokenid]={ 'username': username, 'userdetail':self.users[username]}
@@ -84,6 +109,35 @@ class Chat:
 				msgs[users].append(s_fr['incoming'][users].get_nowait())
 			
 		return {'status': 'OK', 'messages': msgs}
+
+
+	def create_group(self, group_name, sessionid):
+		if group_name in self.groups:
+			return {'status': 'ERROR', 'message': 'Group sudah ada'}
+		self.groups[group_name] = {'group_name': group_name, 'log': [], 'users': []}
+		creator = self.sessions[sessionid]['username']
+		self.groups[group_name]['users'].append(creator)
+		return {'status': 'OK', 'message': self.groups[group_name]}
+
+
+	def join_group(self, group_name, sessionid):
+		if group_name not in self.groups:
+			return {'status': 'ERROR', 'message': 'Group tidak ada'}
+		username = self.sessions[sessionid]['username']
+		if username in self.groups[group_name]['users']:
+			return {'status': 'ERROR', 'message': 'Kamu sudah ada di grup'}
+		self.groups[group_name]['users'].append(username)
+		return {'status': 'OK', 'message': 'Group joined successfully'}
+
+
+	def leave_group(self, group_name, sessionid):
+		if group_name not in self.groups:
+			return {'status': 'ERROR', 'message': 'Group tidak ada'}
+		username = self.sessions[sessionid]['username']
+		if username not in self.groups[group_name]['users']:
+			return {'status': 'ERROR', 'message': 'Kamu tidak bergabung di grup'}
+		self.groups[group_name]['users'].remove(username)
+		return {'status': 'OK', 'message': 'You left the group'}
 
 
 if __name__=="__main__":
