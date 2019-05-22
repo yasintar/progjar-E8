@@ -1,6 +1,7 @@
 import socket
 import os
 import json
+import datetime
 
 TARGET_IP = "127.0.0.1"
 TARGET_PORT = 8889
@@ -49,6 +50,13 @@ class ChatClient:
             elif (command == 'inbox_group'):
                 group = j[1].strip()
                 return self.inbox_group(group)
+            elif (command == 'send_file'):
+                usernameto = j[1]
+                filename = j[2]
+                return self.send_file(usernameto, filename)
+            elif (command == 'download_file'):
+                filename = j[1]
+                return self.download_file(filename)
             else:
                 return "*Maaf, command tidak benar"
         except IndexError:
@@ -156,6 +164,58 @@ class ChatClient:
             return "{}".format(json.dumps(result['messages']))
         else:
             return "Error, {}".format(result['message'])
+
+    def send_file(self, usernameto, filename):
+        if (self.tokenid == ""):
+            return "Error, not authorized"
+        string = "send_file {} {} {} \r\n".format(self.tokenid, usernameto, filename)
+        print string
+        self.sock.sendall(string)
+
+        try:
+            with open(filename, 'rb') as file:
+                while True:
+                    bytes = file.read(1024)
+                    if not bytes:
+                        result = self.sendstring("DONE")
+                        break
+                    self.sock.sendall(bytes)
+                file.close()
+        except IOError:
+            return "Error, file not found"
+
+        if result['status'] == 'OK':
+            return "file sent to {}".format(usernameto)
+        else:
+            return "Error, {}".format(result['message'])
+
+    def download_file(self, filename):
+        if (self.tokenid == ""):
+            return "Error, not authorized"
+        string = "download_file {} {} \r\n".format(self.tokenid, filename)
+        self.sock.sendall(string)
+
+        data = self.sock.recv(1024)
+
+        if data[:2] == 'OK':
+            print data
+            now = datetime.datetime.now()
+            seconds = (now - datetime.datetime(2019, 1, 1)).total_seconds()
+            file = open(str(int(seconds)) + filename, 'wb')
+            if (file):
+                file.write(data[2:])
+                while True:
+                    data = self.sock.recv(1024)
+                    if (data[-4:] == 'DONE'):
+                        data = data[:-4]
+                        file.write(data)
+                        break
+                    file.write(data)
+                file.close()
+            else:
+                return "Error, something happened"
+        else:
+            return "Error, file not found"
 
 if __name__=="__main__":
     cc = ChatClient()

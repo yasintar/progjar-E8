@@ -2,7 +2,9 @@ import sys
 import os
 import json
 import uuid
+import datetime
 from Queue import *
+import glob
 
 class Chat:
 	def __init__(self):
@@ -17,6 +19,7 @@ class Chat:
 
 	def proses(self,data):
 		j=data.split(" ")
+		print j
 		try:
 			command=j[0].strip()
 			if (command=='auth'):
@@ -71,6 +74,20 @@ class Chat:
 				sessionid = j[2].strip()
 				print "{} is leaving {}...".format(self.sessions[sessionid]['username'], group)
 				return self.leave_group(group, sessionid)
+
+			elif (command == 'send_file'):
+				sessionid = j[1]
+				usernameto = j[2]
+				filename = j[3]
+				usernamefrom = self.sessions[sessionid]['username']
+				print "send_file from {} to {}".format(usernamefrom, usernameto)
+
+			elif (command == 'download_file'):
+				sessionid = j[1]
+				filename = j[2]
+				usernamefrom = self.sessions[sessionid]['username']
+				print "{} download_file {}".format(usernamefrom, filename)
+				return self.download_file(sessionid, filename)
 			else:
 				return {'status': 'ERROR', 'message': '**Protocol Tidak Benar'}
 		except IndexError:
@@ -123,7 +140,6 @@ class Chat:
 			
 		return {'status': 'OK', 'messages': msgs}
 
-
 	def create_group(self, group_name, sessionid):
 		if group_name in self.groups:
 			return {'status': 'ERROR', 'message': 'Group sudah ada'}
@@ -168,6 +184,67 @@ class Chat:
 		if username not in self.groups[group_name]['users']:
 			return {'status': 'ERROR', 'message': 'Kamu tidak bergabung di grup'}
 		return {'status': 'OK', 'messages': self.groups[group_name]['log']}
+
+	def send_file(self, sessionid, username_from, username_dest, filename, connection):
+		if (sessionid not in self.sessions):
+			return {'status': 'ERROR', 'message': 'Session Tidak Ditemukan'}
+		s_fr = self.get_user(username_from)
+		s_to = self.get_user(username_dest)
+
+		if (s_fr == False or s_to == False):
+			return {'status': 'ERROR', 'message': 'User Tidak Ditemukan'}
+
+		try:
+			if not os.path.exists(username_dest):
+				os.makedirs(username_dest)
+			with open(os.path.join(username_dest, filename), 'wb') as file:
+				while True:
+					data = connection.recv(1024)
+					print data
+					if (data[-4:] == 'DONE'):
+						data = data[:-4]
+						file.write(data)
+						break
+					file.write(data)
+				file.close()
+		except IOError:
+			raise
+
+		message = {'msg_from': s_fr['nama'], 'msg_to': s_to['nama'], 'msg': 'sent/received {}'.format(filename)}
+		outqueue_sender = s_fr['outgoing']
+		inqueue_receiver = s_to['incoming']
+		try:
+			outqueue_sender[username_from].put(message)
+		except KeyError:
+			outqueue_sender[username_from] = Queue()
+			outqueue_sender[username_from].put(message)
+		try:
+			inqueue_receiver[username_from].put(message)
+		except KeyError:
+			inqueue_receiver[username_from] = Queue()
+			inqueue_receiver[username_from].put(message)
+
+		return {'status': 'OK', 'message': 'File sent'}
+
+	def download_file(self, sessionid, filename, connection):
+		username = self.sessions[sessionid]['username']
+		print "{} download {}".format(username, filename)
+
+		try:
+			file = open(os.path.join(username, filename), 'rb')
+		except IOError:
+			return {'status': 'Err', 'message': 'File not found'}
+
+		result = connection.sendall("OK")
+		while True:
+			data = file.read(1024)
+			if not data:
+				result = connection.sendall("DONE")
+				break
+			connection.sendall(data)
+		file.close()
+		return
+
 
 if __name__=="__main__":
 	j = Chat()
