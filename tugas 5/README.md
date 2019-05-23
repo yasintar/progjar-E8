@@ -3,7 +3,7 @@
 - Jumlah requests 200 dengan jumlah konkuren 2
     - Tanpa Load Balancer
     > Synchronous
-     ![sinkron](https://github.com/yasintar/progjar-E8/fpt5/sinkron.PNG)
+     ![sinkron](fpt5/sinkron.PNG)
      Asynchronous
      ![asinkron](https://github.com/yasintar/progjar-E8/fpt5/asinkron.PNG)
     - Dengan Load Balancer
